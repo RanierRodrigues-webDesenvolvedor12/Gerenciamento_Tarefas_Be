@@ -1,0 +1,6 @@
+{
+  "name": "Agenda Digital e Produtividade",
+  "description": "Uma agenda digital vibrante com otimização inteligente de rotina por IA, controle de metas e lembretes sonoros para combater a procrastinação.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
