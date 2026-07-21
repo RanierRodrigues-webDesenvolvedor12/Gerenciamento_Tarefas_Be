@@ -1,27 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Sparkles,
   Plus,
   Target,
   Flame,
-  Trophy,
-  Zap,
-  Brain,
   Trash2,
   Calendar,
   CheckCircle2,
-  TrendingUp,
-  Award,
   ChevronRight,
   PlusCircle,
   MinusCircle,
   Bell,
   Clock,
   Check,
-  AlertCircle
 } from 'lucide-react';
-import { Task, Goal, AIRoutinesResponse, SubTask } from './types';
+import { Task, Goal, SubTask } from './types';
 import TaskModal from './components/TaskModal';
 import GoalModal from './components/GoalModal';
 import NotificationCenter from './components/NotificationCenter';
@@ -44,7 +37,7 @@ const DEFAULT_TASKS: Task[] = [
       { id: 's2', title: 'Gravar 3 tomadas de vídeo simples no celular', completed: false },
       { id: 's3', title: 'Legendar rápido e postar no Instagram', completed: false }
     ],
-    smartTip: 'Comece pelo roteiro agora mesmo! Escrever a primeira frase leva apenas 30 segundos.'
+    smartTip: undefined,
   },
   {
     id: 't2',
@@ -158,20 +151,6 @@ export default function App() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | undefined>(undefined);
 
-  // IA State
-  const [aiQuote, setAiQuote] = useState(() => {
-    return localStorage.getItem('planner_ai_quote') ||
-      'Seu cérebro foi feito para pensar, não para guardar tarefas. Clique em "Otimizar com IA" para organizar seu dia com inteligência cognitiva! 🧠🔥';
-  });
-  const [aiAnalysis, setAiAnalysis] = useState(() => {
-    return localStorage.getItem('planner_ai_analysis') ||
-      'A inteligência do Gemini pode analisar a carga do seu dia, ordenar suas tarefas da forma ideal para gastar menos energia mental e fornecer hacks rápidos contra a procrastinação.';
-  });
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [lastOptimizedDate, setLastOptimizedDate] = useState<string | null>(() => {
-    return localStorage.getItem('planner_last_optimized_date');
-  });
-
   // Daily mini-habits interactive state
   const [waterIntake, setWaterIntake] = useState<number>(() => {
     const saved = localStorage.getItem('habit_water_intake');
@@ -193,26 +172,12 @@ export default function App() {
   }, [goals]);
 
   useEffect(() => {
-    localStorage.setItem('planner_ai_quote', aiQuote);
-  }, [aiQuote]);
-
-  useEffect(() => {
-    localStorage.setItem('planner_ai_analysis', aiAnalysis);
-  }, [aiAnalysis]);
-
-  useEffect(() => {
     localStorage.setItem('habit_water_intake', waterIntake.toString());
   }, [waterIntake]);
 
   useEffect(() => {
     localStorage.setItem('habit_focus_minutes', focusMinutes.toString());
   }, [focusMinutes]);
-
-  useEffect(() => {
-    if (lastOptimizedDate) {
-      localStorage.setItem('planner_last_optimized_date', lastOptimizedDate);
-    }
-  }, [lastOptimizedDate]);
 
   // Generate 7 days of the current week (July 20 to July 26, 2026)
   const weekDays = [
@@ -334,84 +299,6 @@ export default function App() {
         return g;
       })
     );
-  };
-
-  // Optimize routine with Gemini AI API
-  const handleOptimizeRoutine = async () => {
-    if (dailyTasks.length === 0) {
-      alert('Adicione pelo menos uma tarefa para este dia antes de solicitar a otimização com Inteligência Artificial!');
-      return;
-    }
-
-    setIsOptimizing(true);
-    try {
-      const response = await fetch('/api/optimize-routine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tasks: dailyTasks,
-          goals: goals
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Servidor indisponível ou erro no processamento.');
-      }
-
-      const data: AIRoutinesResponse & { offlineMode?: boolean } = await response.json();
-
-      // Apply the optimized sorting and tips
-      const orderedIds = data.orderedTaskIds || [];
-      const tipsArray = data.tips || [];
-
-      setTasks((prevTasks) => {
-        // Map all tasks with their updated tips
-        return prevTasks.map((t) => {
-          // Check if there is a tip for this task in the AI's response
-          const matchingTip = tipsArray.find((tip) => tip.taskId === t.id);
-          if (matchingTip) {
-            return { ...t, smartTip: matchingTip.tip };
-          }
-          return t;
-        });
-      });
-
-      // Also sort the tasks array in state globally?
-      // Better: we can sort the local tasks dynamically in the UI of the selected day based on orderedIds!
-      // To preserve sorting permanently, we can assign an optional 'aiOrder' index, or we can sort them when rendering.
-      // Let's create an aiOrder index or rearrange state tasks.
-      // Rearranging in state for the selected day:
-      setTasks((prevTasks) => {
-        const otherDaysTasks = prevTasks.filter((t) => t.date !== selectedDate);
-        const thisDayTasks = prevTasks.filter((t) => t.date === selectedDate);
-
-        // Sort this day tasks according to orderedIds
-        const sortedThisDay = [...thisDayTasks].sort((a, b) => {
-          const indexA = orderedIds.indexOf(a.id);
-          const indexB = orderedIds.indexOf(b.id);
-          if (indexA === -1 && indexB === -1) return 0;
-          if (indexA === -1) return 1;
-          if (indexB === -1) return -1;
-          return indexA - indexB;
-        });
-
-        return [...otherDaysTasks, ...sortedThisDay];
-      });
-
-      setAiQuote(data.motivationQuote);
-      setAiAnalysis(data.procrastinationAnalysis);
-      setLastOptimizedDate(selectedDate);
-
-      // Simple positive notification
-      if (data.offlineMode) {
-        alert('Otimização local ativada com sucesso! (Modo offline para agilidade)');
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert('Não foi possível obter a otimização com IA no momento. Mas continue firme, seu planejamento já está ótimo!');
-    } finally {
-      setIsOptimizing(false);
-    }
   };
 
   // Helper for Category badge colors
@@ -953,16 +840,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* AI Smart tip if available */}
-                    {task.smartTip && (
-                      <div className="mt-1.5 ml-10 p-3 bg-gradient-to-r from-orange-500/10 to-pink-500/10 border border-orange-100/50 rounded-2xl flex gap-2.5 items-start">
-                        <Brain className="h-4.5 w-4.5 text-orange-500 shrink-0 mt-0.5 animate-pulse" />
-                        <p className="text-[11px] text-gray-700 leading-relaxed font-semibold">
-                          <span className="font-extrabold text-orange-600">Dica da IA para agir:</span>{' '}
-                          {task.smartTip}
-                        </p>
-                      </div>
-                    )}
                   </motion.div>
                 );
               })}
@@ -982,66 +859,9 @@ export default function App() {
           </div>
         </section>
 
-        {/* RIGHT SIDEBAR: Smart Reminders & Habits & Quick Insights (Column 3 - cols 3) */}
+        {/* RIGHT SIDEBAR: Habits & Quick Insights (Column 3 - cols 3) */}
         <aside className="col-span-12 lg:col-span-3 flex flex-col gap-6">
           
-          {/* Smart Reminders / AI Optimization coach */}
-          <section className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm flex flex-col gap-4">
-            <h2 className="text-xs font-bold text-pink-600 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-2 h-2 bg-pink-500 rounded-full animate-pulse" />
-              Lembretes Inteligentes
-            </h2>
-
-            <div className="space-y-3">
-              {/* Dynamic Quote Box */}
-              <div className="p-3 bg-gradient-to-r from-orange-400 to-pink-500 rounded-2xl text-white shadow-md relative overflow-hidden group">
-                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="flex justify-between items-start mb-1.5">
-                  <p className="text-[10px] font-black uppercase opacity-90 tracking-wide">Conselho da IA</p>
-                  <span className="text-[9px] font-black bg-white/20 px-1.5 py-0.5 rounded uppercase">Agora</span>
-                </div>
-                <p className="text-[11px] leading-relaxed font-semibold italic">
-                  "{aiQuote}"
-                </p>
-              </div>
-
-              {/* Day Analysis Explanation */}
-              <div className="p-3 bg-gray-50 border border-gray-100 rounded-2xl">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-tight mb-1">
-                  Diagnóstico de Resistência
-                </p>
-                <p className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                  {aiAnalysis}
-                </p>
-              </div>
-            </div>
-
-            {/* AI Action trigger */}
-            <button
-              onClick={handleOptimizeRoutine}
-              disabled={isOptimizing || dailyTasks.length === 0}
-              className={`w-full rounded-xl py-3 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
-                dailyTasks.length === 0
-                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
-                  : isOptimizing
-                  ? 'bg-gradient-to-r from-orange-500 to-pink-500 opacity-80 cursor-wait'
-                  : 'bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:shadow-xl hover:brightness-110 hover:scale-[1.01] active:scale-[0.99]'
-              }`}
-            >
-              {isOptimizing ? (
-                <>
-                  <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Otimizando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                  Otimizar Rotina com IA
-                </>
-              )}
-            </button>
-          </section>
-
           {/* Daily Habits tracker */}
           <section className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm flex flex-col gap-4">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
