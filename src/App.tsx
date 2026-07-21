@@ -21,7 +21,7 @@ import {
   Check,
   AlertCircle
 } from 'lucide-react';
-import { Task, Goal, AIRoutinesResponse, SubTask } from './types';
+import { Task, Goal, SubTask } from './types';
 import TaskModal from './components/TaskModal';
 import GoalModal from './components/GoalModal';
 import NotificationCenter from './components/NotificationCenter';
@@ -336,38 +336,38 @@ export default function App() {
     );
   };
 
-  // Optimize routine with Gemini AI API
-  const handleOptimizeRoutine = async () => {
+  // Optimize routine locally (client-side only)
+  const handleOptimizeRoutine = () => {
     if (dailyTasks.length === 0) {
-      alert('Adicione pelo menos uma tarefa para este dia antes de solicitar a otimização com Inteligência Artificial!');
+      alert('Adicione pelo menos uma tarefa para este dia antes de solicitar a otimização!');
       return;
     }
 
     setIsOptimizing(true);
-    try {
-      const response = await fetch('/api/optimize-routine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tasks: dailyTasks,
-          goals: goals
-        })
+
+    setTimeout(() => {
+      const sortedTasks = [...dailyTasks].sort((a, b) => {
+        const priorityWeight = { alta: 3, media: 2, baixa: 1 };
+        return (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0);
       });
 
-      if (!response.ok) {
-        throw new Error('Servidor indisponível ou erro no processamento.');
-      }
-
-      const data: AIRoutinesResponse & { offlineMode?: boolean } = await response.json();
-
-      // Apply the optimized sorting and tips
-      const orderedIds = data.orderedTaskIds || [];
-      const tipsArray = data.tips || [];
+      const orderedIds = sortedTasks.map((t) => t.id);
+      const tipsArray = dailyTasks.map((t) => {
+        let tip = 'Divida esta tarefa em micro-passos de 5 minutos para começar sem resistência.';
+        if (t.priority === 'alta') {
+          tip = 'Esta é sua prioridade máxima hoje. Use a técnica Pomodoro e desligue as notificações para focar totalmente nela!';
+        } else if (t.category === 'Trabalho') {
+          tip = 'Remova todas as distrações da mesa e defina o que é o "sucesso" para essa entrega.';
+        } else if (t.category === 'Estudos') {
+          tip = 'Faça uma sessão ativa: resuma ou explique para si mesmo em voz alta o que aprendeu.';
+        } else if (t.category === 'Saúde') {
+          tip = 'Seu corpo é seu motor! Realize essa tarefa logo para garantir disposição o dia todo.';
+        }
+        return { taskId: t.id, tip };
+      });
 
       setTasks((prevTasks) => {
-        // Map all tasks with their updated tips
         return prevTasks.map((t) => {
-          // Check if there is a tip for this task in the AI's response
           const matchingTip = tipsArray.find((tip) => tip.taskId === t.id);
           if (matchingTip) {
             return { ...t, smartTip: matchingTip.tip };
@@ -376,16 +376,10 @@ export default function App() {
         });
       });
 
-      // Also sort the tasks array in state globally?
-      // Better: we can sort the local tasks dynamically in the UI of the selected day based on orderedIds!
-      // To preserve sorting permanently, we can assign an optional 'aiOrder' index, or we can sort them when rendering.
-      // Let's create an aiOrder index or rearrange state tasks.
-      // Rearranging in state for the selected day:
       setTasks((prevTasks) => {
         const otherDaysTasks = prevTasks.filter((t) => t.date !== selectedDate);
         const thisDayTasks = prevTasks.filter((t) => t.date === selectedDate);
 
-        // Sort this day tasks according to orderedIds
         const sortedThisDay = [...thisDayTasks].sort((a, b) => {
           const indexA = orderedIds.indexOf(a.id);
           const indexB = orderedIds.indexOf(b.id);
@@ -398,20 +392,13 @@ export default function App() {
         return [...otherDaysTasks, ...sortedThisDay];
       });
 
-      setAiQuote(data.motivationQuote);
-      setAiAnalysis(data.procrastinationAnalysis);
+      setAiQuote('O segredo para progredir é começar. Faça o que puder, com o que tem, onde estiver!');
+      setAiAnalysis('Seus afazeres foram organizados com base na prioridade declarada. Comece pela tarefa mais pesada (Eat that Frog) para liberar dopamina e manter o ritmo o resto do dia.');
       setLastOptimizedDate(selectedDate);
 
-      // Simple positive notification
-      if (data.offlineMode) {
-        alert('Otimização local ativada com sucesso! (Modo offline para agilidade)');
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert('Não foi possível obter a otimização com IA no momento. Mas continue firme, seu planejamento já está ótimo!');
-    } finally {
+      alert('Otimização local ativada com sucesso!');
       setIsOptimizing(false);
-    }
+    }, 500);
   };
 
   // Helper for Category badge colors
